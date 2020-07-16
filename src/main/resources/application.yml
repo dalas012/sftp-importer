@@ -1,0 +1,10 @@
+sftp:
+  hostname: hostname
+  username: username
+  password: password
+  fixedRateValue: 30                              # seconds
+  remoteFilesDirPath: /example/path               # if files in root -> path value will be '/'
+  localFilesDirPath: /example/path                # warning: don't forget about access rights
+
+
+

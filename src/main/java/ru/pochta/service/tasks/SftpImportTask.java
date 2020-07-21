@@ -3,6 +3,7 @@ package ru.pochta.service.tasks;
 import lombok.extern.slf4j.Slf4j;
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.sftp.SFTPClient;
+import net.schmizz.sshj.sftp.SFTPException;
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,6 @@ public class SftpImportTask implements Runnable {
 
     private YmlProperties properties;
     private final String CSV_FILE_EXT = ".csv";
-    private final String PROCESSING_LOG_PREFIX = "  ===>  Processing file: ";
     private final String HASH_SUM_FILE_NAME = "hashsum.txt";
     private final String ATTRIBUTES_FILE_NAME = "attributes.txt";
     private final String CHANGED_FILES_DIR_NAME = "changed";
@@ -51,11 +51,11 @@ public class SftpImportTask implements Runnable {
     @Override
     public void run() {
         try {
-            log.info("   === START IMPORTING AND CHECKING FILES ===   ");
+            log.info("=== START IMPORTING AND CHECKING FILES ===");
             checkLocalDirs();
             downloadAllFiles();
             checkSums();
-            log.info("   === END IMPORTING AND CHECKING FILES ===   ");
+            log.info("=== END IMPORTING AND CHECKING FILES ===");
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -77,26 +77,28 @@ public class SftpImportTask implements Runnable {
         BufferedWriter writer = new BufferedWriter(new FileWriter(attributesFile, true));
         SSHClient sshClient = setupSshj();
         SFTPClient sftpClient = sshClient.newSFTPClient();
-        log.info(" --> Downloading files start...");
+        log.info("Downloading files start...");
         sftpClient.ls(properties.getRemoteFilesDirPath())
                 .stream()
                 .filter(item -> item.getName().endsWith(CSV_FILE_EXT))
                 .forEach(item -> {
+                    String itemAttribute = item.getName() + "_" + item.getAttributes().getMtime();
                     try {
-                        String itemAttribute = item.getName() + "_" + item.getAttributes().getMtime();
                         if (!attributesSet.contains(itemAttribute)) {
                             attributesSet.add(itemAttribute);
                             writer.write(itemAttribute + System.lineSeparator());
                             sftpClient.get(item.getPath(), currentFilesPath);
-                            log.info("  ===>  Downloaded possibly modified csv file: " + itemAttribute);
+                            log.info(" - " + itemAttribute + " - downloaded");
                         } else {
-                            log.debug("  ===>  Skipped possibly processed csv file: " + itemAttribute);
+                            log.debug(" - " + itemAttribute + " - skipped");
                         }
+                    } catch (SFTPException e) {
+                        log.warn(" - " + itemAttribute + " - skipped. " + e.getMessage());
                     } catch (IOException e) {
                         log.error(e.getMessage(), e);
                     }
                 });
-        log.info(" --> Downloading files end!");
+        log.info("Downloading files end!");
         sftpClient.close();
         sshClient.disconnect();
         writer.close();
@@ -106,7 +108,7 @@ public class SftpImportTask implements Runnable {
         File hashSumsFile = getHashSumsFile();
         Set<String> hashSet = new HashSet<>(Files.readAllLines(hashSumsFile.toPath()));
         BufferedWriter writer = new BufferedWriter(new FileWriter(hashSumsFile, true));
-        log.info(" --> Check and move files start...");
+        log.info("Check and move files start...");
         try (Stream<Path> paths = Files.walk(Paths.get(currentFilesPath))) {
             paths
                     .filter(Files::isRegularFile)
@@ -128,7 +130,7 @@ public class SftpImportTask implements Runnable {
         } catch (IOException e) {
             log.error(e.getMessage(), e);
         }
-        log.info(" --> Check and move files end!");
+        log.info("Check and move files end!");
         writer.close();
     }
 
@@ -137,9 +139,9 @@ public class SftpImportTask implements Runnable {
                 "/" + renamedFilePath.getFileName().toString().replace(CSV_FILE_EXT, "_" + hex + CSV_FILE_EXT));
         try {
             Files.move(renamedFilePath, targetPath);
-            log.info(PROCESSING_LOG_PREFIX + "Renamed file detected and moved: " + targetPath.getFileName());
+            log.info(" - " + targetPath.getFileName() + " - renamed");
         } catch (FileAlreadyExistsException e) {
-            log.info(PROCESSING_LOG_PREFIX + "Renamed file already exists: " + renamedFilePath);
+            log.info(" - " + renamedFilePath + " - renamed, already exists");
             Files.delete(renamedFilePath);
         }
     }
@@ -148,7 +150,7 @@ public class SftpImportTask implements Runnable {
         Path targetPath = Paths.get(changedFilesPath +
                 "/" + changedFilePath.getFileName().toString().replace(CSV_FILE_EXT, "_" + hex + CSV_FILE_EXT));
         Files.move(changedFilePath, targetPath);
-        log.info(PROCESSING_LOG_PREFIX + "Changed file detected and moved: " + targetPath.getFileName());
+        log.info(" - " + targetPath.getFileName() + " - changed");
     }
 
     private File getHashSumsFile() throws IOException {

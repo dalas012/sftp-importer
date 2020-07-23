@@ -14,5 +14,8 @@ public class YmlProperties {
     private String password;
     private String remoteFilesDirPath;
     private String localFilesDirPath;
+    private String csvSeparator;
+    private String remapQueryFilePath;
     private long fixedRateValue;
+    private boolean taskEnabled;
 }

@@ -1,5 +1,6 @@
 package ru.pochta.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -10,11 +11,13 @@ import ru.pochta.config.YmlProperties;
 import ru.pochta.service.tasks.SftpImportTask;
 
 @Service
+@Slf4j
 public class TaskRunnerServiceImpl implements TaskRunnerService {
 
-    private long fixedRateValue;
-    private ThreadPoolTaskScheduler taskScheduler;
-    private SftpImportTask sftpImportTask;
+    private final long fixedRateValue;
+    private final boolean taskEnabled;
+    private final ThreadPoolTaskScheduler taskScheduler;
+    private final SftpImportTask sftpImportTask;
 
     @Autowired
     public TaskRunnerServiceImpl(@Qualifier("serviceTaskScheduler") ThreadPoolTaskScheduler scheduler,
@@ -23,6 +26,7 @@ public class TaskRunnerServiceImpl implements TaskRunnerService {
         this.taskScheduler = scheduler;
         this.sftpImportTask = sftpImportTask;
         this.fixedRateValue = properties.getFixedRateValue() * 1000;
+        this.taskEnabled = properties.isTaskEnabled();
     }
 
     @Override
@@ -37,7 +41,12 @@ public class TaskRunnerServiceImpl implements TaskRunnerService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void runTaskAfterStart() {
-        runTask();
+        if (this.taskEnabled) {
+            log.info("Scheduled tasks runner enabled! Start running tasks...");
+            runTask();
+        } else {
+            log.info("Scheduled tasks runner disabled!");
+        }
     }
 
 }

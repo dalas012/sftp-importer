@@ -1,10 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:${sftp.localFilesDirPath}/data
+    driverClassName: org.h2.Driver
+    username: user
+    password: pwd
+  h2:
+    console:
+      enabled: true
+      path: /h2/
+      settings:
+        web-allow-others: true
+  jpa:
+    databasePlatform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      use-new-id-generator-mappings: true
+
 sftp:
   hostname: hostname
   username: username
   password: password
+  taskEnabled: true
   fixedRateValue: 30                              # seconds
   remoteFilesDirPath: /example/path               # if files in root -> path value will be '/'
   localFilesDirPath: /example/path                # warning: don't forget about access rights
+  csvSeparator: ','
+  remapQueryFilePath: /path/to/query/file.sql
 
 
 

@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +43,7 @@ public class SftpImportTask implements Runnable {
     private final UniversalManifestEntryRepository universalRepository;
     private final DataSource dataSource;
 
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm");
     private static final String CSV_FILE_EXT = ".csv";
     private static final String HASH_SUM_FILE_NAME = "checksums.txt";
     private static final String ATTRIBUTES_FILE_NAME = "attributes.txt";
@@ -267,11 +269,7 @@ public class SftpImportTask implements Runnable {
                             List<IHerbManifestEntry> iHerbEntries = csvToBean.parse();
                             iHerbRepository.saveAll(iHerbEntries);
                             template.update(remapQuery);
-                            Path createdPath = Files.createFile(
-                                    Paths.get(createdFilesPath + "/" +
-                                            "um_" + path.toFile().getName().replace(CSV_FILE_EXT, "_" + LocalDateTime.now().toString() + CSV_FILE_EXT))
-                            );
-                            exportToCSV(createdPath, universalRepository.findAll());
+                            exportToCSV(path.toFile().getName(), universalRepository.findAll());
                             universalRepository.deleteAll();
                             iHerbRepository.deleteAll();
                             moveRemappedFiles(path);
@@ -285,7 +283,12 @@ public class SftpImportTask implements Runnable {
         log.info("Remap files end!");
     }
 
-    private void exportToCSV(Path createdPath, List<UniversalManifestEntry> universalManifestEntries) {
+    private void exportToCSV(String fileName, List<UniversalManifestEntry> universalManifestEntries) throws IOException {
+        String now = LocalDateTime.now().format(DATE_TIME_FORMATTER);
+        Path createdPath = Files.createFile(
+                Paths.get(createdFilesPath + "/" +
+                        "um_" + fileName.replace(CSV_FILE_EXT, "_" + now + CSV_FILE_EXT))
+        );
         try (var writer = Files.newBufferedWriter(createdPath, StandardCharsets.UTF_8)) {
             StatefulBeanToCsv<UniversalManifestEntry> beanToCsv = new StatefulBeanToCsvBuilder<UniversalManifestEntry>(writer)
                     .withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
